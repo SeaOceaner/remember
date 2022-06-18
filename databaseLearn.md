@@ -185,7 +185,7 @@ case...when...then....when...than....else.....when.....; 当什么什么如何�
 
 不修改数据只是将查询结果显示为工资上调
 
-实例：
+实例： 
 
 select ename,job,sal oldersal,(case job when 'manager'then sal*1.1 when 'salesman' then sal*1.5 else sal end) as newsal from emp；
 
@@ -274,7 +274,7 @@ group by
 
 执行顺序：
 
-1 from 2where 3group 4select 5order by
+1 from 2where 3group by4select 5order by
 
 计算每个部门的工资和
 

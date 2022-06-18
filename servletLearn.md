@@ -1,3 +1,5 @@
+# JAVAWEB
+
 # 1  servlet：
 
 ```html
@@ -1036,15 +1038,16 @@ public class TemplateForm extends HttpServlet {
 
 + 为什么需要session来保存会话状态呢？
 
++ getSession()与getSession(true)一样，获取request对象关联的session对象，如果没有session，则返回一个新的session。
+
+  getSession(false)也是返回一个request对象关联的session对象，但如果没有session，则返回null。
+
   + ```java
       HttpSession session = req.getSession();
             resp.setContentType("text/html");
             PrintWriter out = resp.getWriter();
             out.print(session);
       ```
-    ```
-  
-    ```
 
 证明session的特性:
 
@@ -1109,7 +1112,7 @@ public class TemplateForm extends HttpServlet {
     </session-config>
 ```
 
-```
+```java
 package com.sea;
 
 import jakarta.servlet.ServletException;
@@ -1125,8 +1128,10 @@ import java.io.IOException;
 public class TemplateForm extends HttpServlet {
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        HttpSession session = req.getSession();
+        ---------------------------------------------------------------------------------------------------------------------------
+        HttpSession session = req.getSession(); //只有第一次有效
         if(session != null && session.getAttribute("userinfo") != null) {
+        --------------------------------------------------------------------------------------------------------------------------
             if ("/emp/List".equals(req.getServletPath())) {
                 doList(req, resp);
             }
@@ -1163,6 +1168,335 @@ public class TemplateForm extends HttpServlet {
 }
 
 ```
+
+
+
+# 6 Cookie原理和应用
+
++ session的实现原理中，每一个session对象都是关联了一个sessionid 例如：
+  + JSESSION=41hdiuqahwdooaidjiowjiopdjqwoj08
+  + 以上的是一个键值对应对数据其实就是cookie对象
+  + 对于session关联的cookie来说，这个cookie是被保存在浏览器的运行内存中的。
+  + 只要浏览器不关闭，用户再次请求的时候，全自动将内存中的cookie发送给服务器
+  + 服务器就是根据这个值来找到对应的session对象的
++ cookie是怎么生成的？
++ cookie有什么用呢？
+  + cookie和session都是为了保存会话的状态。
+    + cookie是为了将状态信息存在浏览器客服端上。(cookie数据存在浏览器客服端上)
+    + session是为了将状态信息存在服务器上。
++ 保存在什么地方？
+  + 可以保存在内存中 也可以存在外存中
++ 怎么保存的？
++ 为什么要session和cookie呢？
+  + 因为http是一个无状态的协议
++ setMaxAge() 设置有效时间
+  + 没有设置有效时间默认保存在运行内存中 关闭浏览器，cookie就会消失 只要设置了有效时间>0 cookie一定会存在外存中
+  + 并且失效了会中内存中被清除
++ setPath() 
++ cookie()  构造方法
++ 在java的servlet中，对cookie提供了哪些支持呢？
+  + 提供了一个cookie类来专门表示cookie数据，jakarta.servlet.http.cookie
+    + 浏览器会自动发送cookie
+  + java程序怎么发送cookie给程序呢？
+
+```java
+public class CookieTest extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        //创建cookie对象
+        Cookie cookie = new Cookie("production","123456879");
+
+        //设置cookie在一小时以后关闭 >0 会保存到外存对应的时间 =0 会删除同名cookie <0表示该cookie不会被存储(硬盘文件中) 还会在运行内存中和不调用Maxage是相同的效果
+        cookie.setMaxAge(3600);
+        
+        cookie.setPath("/session");//表示提交cookie的最上乘目录
+        
+        //将cookie回复到浏览器中
+        response.addCookie(cookie);
+        
+        //获取cookie
+        Cookie[] cookies = request.getCookies();
+        if(cookies != null ){
+            //获取cookie里面的key和value
+            for(Cookie i:cookies){
+                String name = i.getName();
+                String value = i.getValue();
+                System.out.println(name + "=" + value);
+            }
+        }
+        
+    }
+}
+```
+
++ cookie中的path，cookie关联的路径
+  + 默认是请求路径上一级的所有子路径，cookie都会被发送到服务器
+
+  
+
+# 7 过滤器的使用和及其实现原理：
+
+
+
+## 7.1 过滤器的实现
+
++ 代码重复问题如何解决？
+
+  + 可以使用servlet规范中提供的filter
+    + 有什么用？执行原理是什么？
+    + 一般是在过滤器中编写公共代码
+
++ 过滤器怎么写？
+
+  + ### 编写一个java类实现一个接口 jakarta.servlet.filter实现接口当中的所有方法  实现filter接口
+
++ filter的配置方法(xml中)
+
+  + 十分类似servletde配置方法
+
+  + ```html
+        <filter>
+            <filter-name>filter</filter-name>
+            <filter-class>com.sea.FilterTest</filter-class>
+        </filter>
+        <filter-mapping>
+            <filter-name>filter</filter-name>
+            <url-pattern>/hello</url-pattern>
+        </filter-mapping>
+    
+    ```
+
+```java
+@WebFilter("/test") //这样也可以配置filter 可以过滤到/test之后的文件
+@WebFilter("/*")   	// 过滤整个webapp的所有servlet
+@WebFilter("*.html") //过滤所有html结尾的路径 叫做前缀匹配
+```
+
++ 一些特性：
+  + servlet在服务器启动时不会创建servlet实例
+  + 但是filter在服务器启动的情况下就会创建一个实例
+  + 另外servlet是单例的，并且filter也是单例的。
++ 目标servlet是否执行，却决于两个条件
+  + 第一：过滤器中是否编写了：Chain.doFilter(request,respond);如果没有下一个过滤器了 执行最终的下一个servlet
+    + 注意：filter的优先级要不servlet更高的
+
+```java
+@Override
+    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
+        //只用用户请求一次，就执行一次。
+        System.out.println("start");
+        //执行下一个过滤器，如果没有下一个过滤器则执行目标servlet
+        //向下走 没有他不行
+        //重要的一句话
+        /*---------------------------------------------------*/
+        filterChain.doFilter(servletRequest,servletResponse); //会有一种类似于陷入的过程
+        /*-------------------------------------------------*/
+        System.out.println("end");
+    }
+
+```
+
++ 嵌套filter也是可以的。 类似于栈的结构 后进先出
+
+  + 同级谁先谁后与什么有关呢？优先级问题？
+
+    + filter-mapping在xml中在上就会先执行上面的filter
+  + 使用注解形式。配置filter的时候同级执行顺序是怎样的呢？
+    + 先后顺序取决于类名的比较结果
+    + 比如：
+      + filter1.java和filter2.java 先执行filter1.javad
+      + filterA.java和filterB.java 先执行filterA.java
+    + filter的生命周期
+      + 出了实例化时间不同之外，都是一致的
+
+![HTld7.png](https://s1.328888.xyz/2022/05/11/HTld7.png)
+
++ 使用了filter之后：
+  + 在编译过程阶段已经完成了调用关联
+  + 如果你希望改变调用的顺序，必须修改一下代码
+  + java代码修改，需要重新编译，项目要重新发布，这是一个繁琐的过程
+  + 显然，这种设计违背了；OCP(open close principle) 即开闭原则
+  + OCP：对拓展开放对修改关闭
+    + 对项目扩展是没有问题的，但是最耗不要修改原有的代码。
+
+    + 过滤器就有这样的能力
+
+    + 过滤器最大的优点：
+      + 在程序编译阶段不会确定调用顺序，因为filter的调用顺序是配置到web.xml文件中的，只要修改xml文件中的filter-mapping顺序，
+
+    + 责任链最大的特点是可以在程序运行中实现动态的组合程序的调用顺序
+
+    + ```java
+      package com.sea;
+      
+      import jakarta.servlet.*;
+      import jakarta.servlet.annotation.WebFilter;
+      
+      import java.io.IOException;
+      
+      
+      @WebFilter("/test")
+      public class FilterTest implements Filter {
+      
+          public FilterTest() {
+              System.out.println("no param constructor");
+          }
+      
+          @Override
+          public void init(FilterConfig filterConfig) throws ServletException {
+              //init方法在filter第一次创建时调用 并且只使用一次
+      
+          }
+      
+          @Override
+          public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
+              //只用用户请求一次，就执行一次。
+              System.out.println("start");
+              //执行下一个过滤器，如果没有下一个过滤器则执行目标servlet
+              //向下走 没有他不行
+              //重要的一句话
+              /*---------------------------------------------------*/
+              filterChain.doFilter(servletRequest,servletResponse); //会有一种类似于陷入的过程
+              /*-------------------------------------------------*/
+              System.out.println("end");
+      
+      
+          }
+      
+          @Override
+          public void destroy() {
+              //在被销毁之前调用，并且只执行一次
+      
+          }
+      }
+      ```
+
+## 7.2  责任链设计模式
+
+
+
+​	
+
+# 8 Listener 监听器
+
++ 什么是监听器？
+
+  + 监听器是servlet规范中的一员，就像Filter也是servlet中的一员
+  + 在servlet中，所有的监听器的接口都是listener结尾
+
++ 监听器有什么作用？
+
+  + 监听器实际上是servlet规范留给我们java程序员的特殊时机。
+  + 特殊的时刻需要执行这段代码，你需要想到使用监听器。
+
++ servlet中提供哪些监听器呢？
+
++ jakarta包下的：
+
+  + servletContextLiStener
+  + servletContextAttributeListener
+  + servletRequestListener
+  + servletRequestAttributeListener
+
++ http包下的：
+
+  + HttpSessionListener
+  + HttpSessionAttributeListener
+  + HttpSessionBindingListener
+  + HttpSessionActivationListener
+
++ 实现一个监听器
+
+  + 第一步 编写一个类实现servletContextListener接口，并且实现方法
+
+  + ```java
+    
+    public class myListener implements ServletContextListener {
+        @Override
+        public void contextInitialized(ServletContextEvent sce) {
+    
+        }
+    
+        @Override
+        public void contextDestroyed(ServletContextEvent sce) {
+    
+        }
+    }
+    ```
+
+  + 第二步 在xml文件中配置信息
+
+    ```html
+    <?xml version="1.0" encoding="UTF-8"?>
+    <web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_5_0.xsd"
+             version="5.0">
+        <listener>
+            <listener-class>com.sea.myListener</listener-class>
+        </listener>
+        
+    
+    </web-app>
+    ```
+
+    ```java
+    import jakarta.servlet.ServletContextEvent;
+    import jakarta.servlet.ServletContextListener;
+    import jakarta.servlet.annotation.WebListener;
+    
+    @WebListener //注释形式的配置listener
+    public class myListener implements ServletContextListener {
+        @Override
+        public void contextInitialized(ServletContextEvent sce) {
+    		//写一些你想在特殊时刻想要执行的代码即可
+        }
+    
+        @Override
+        public void contextDestroyed(ServletContextEvent sce) {
+    		
+        }
+    }
+    ```
+
+    + 注意：所有监听器中的方法都是不需要javaweb程序员调用的，都是由服务器来负责调用的。
+    + 当某个特殊的时间发生后，web服务器会自动调用
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
